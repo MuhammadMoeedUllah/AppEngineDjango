@@ -1,0 +1,78 @@
+name: Deploy Pipeline
+on:
+  push:
+    # Sequence of patterns matched against refs/heads
+    branches:
+      - 'main'
+jobs:
+  GCloudDeployment:
+    name: Deployment
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+      # might delete this
+      id-token: 'write'
+
+    runs-on: ubuntu-latest
+    steps:
+        - name: install build essentials
+          run: |
+            sudo apt-get install build-essential
+            sudo pip3 install --upgrade setuptools
+        - name: Checkout To Repo
+          uses: actions/checkout@v3
+        - uses: actions/setup-python@v4
+          with:
+            python-version: '3.8'
+        - name: create-json
+          id: create-json
+          uses: jsdaniell/create-json@1.1.2
+          with:
+            name: "GCP_SA_KEY.json"
+            json: ${{ secrets.GCP_SA_KEY }}
+            dir: "src/"
+        - uses: KengoTODA/actions-setup-docker-compose@main
+          with:
+            version: '2.9.0'
+        - name: DJango Tests
+          run: |
+            echo "PYTHON_ENV=dev" >> .env
+            docker compose build app
+            docker run quotesmart_app sh -c "python manage.py test"
+            ex +g/PYTHON/d -cwq .env
+            cat .env
+        - run: |
+            docker compose -f docker-compose-deploy.yml build app 
+            docker login -u _json_key -p "$(cat src/GCP_SA_KEY.json)" https://gcr.io
+            docker tag quotesmart_app gcr.io/decent-vertex-357610/quotesmart:latest 
+            docker push gcr.io/decent-vertex-357610/quotesmart:latest 
+
+        - name: 'Setup Cloud SDK'
+          uses: 'google-github-actions/setup-gcloud@v0'
+          with:
+            project_id: '${{ secrets.PROJECT_ID }}'
+            service_account_key: '${{ secrets.GCP_SA_KEY }}'
+
+        - name: 'Deploy to App Engine'
+          run: |
+            ls -lah
+            gcloud app deploy app.yaml --image-url=gcr.io/decent-vertex-357610/quotesmart:latest
+
+        # - uses: RafikFarhad/push-to-gcr-github-action@v4.1
+        #   name: Push to GCR
+        #   with:
+        #     gcloud_service_key: ${{ secrets.GCP_SA_KEY }} # can be base64 encoded or plain text
+        #     registry: gcr.io
+        #     project_id: ${{secrets.PROJECT_ID}}
+        #     image_name: quotesmart_app
+        #     image_tag: latest
+        #     # dockerfile: ./docker/Dockerfile.prod
+        #     # context: ./docker
+        #     push_only: true            
+
+
+
+
+
+

@@ -1,0 +1,22 @@
+FROM python:3.8
+
+COPY ./requirements.txt /requirements.txt
+COPY ./src /web
+COPY ./creds.json /secrets/creds.json
+COPY ./.env /web/.env
+RUN ["chmod", "+x", "/web/run.sh"]
+WORKDIR /web
+
+RUN python -m venv /py && \
+    /py/bin/pip install --upgrade pip && \
+    /py/bin/pip install -r /requirements.txt && \
+    adduser --disabled-password --no-create-home django-user
+
+ENV PATH="/py/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV GOOGLE_APPLICATION_CREDENTIALS="/secrets/creds.json"
+USER django-user
+
+# Gunicorn as app server
+CMD ./run.sh $PORT

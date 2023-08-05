@@ -1,0 +1,10 @@
+# Virtual Env
+django4/
+
+#macOS Files
+.DS_Store
+virtualenv
+*.pyc
+__pycache__/
+creds.json
+.history
